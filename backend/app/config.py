@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./data/app.db"
     UPLOAD_DIR: str = str(Path(__file__).parent.parent / "uploads")
 
+    # CORS — 生产环境通过环境变量 CORS_ORIGINS 设置
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,https://complaint-analysis-production.up.railway.app"
+
     # AI defaults — override via env vars
     AI_API_KEY: str = ""
     AI_BASE_URL: str = "https://api.openai.com/v1"

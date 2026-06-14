@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .database import engine, Base
+from .config import settings
 from .routes import auth, projects, upload, labeling, analysis, report
 
 # Create tables
@@ -10,9 +11,12 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="卫生投诉分析平台", version="1.0.0")
 
+# CORS — 仅允许配置的域名 + 本地开发
+allowed_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
