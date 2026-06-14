@@ -1,0 +1,101 @@
+/* ═════ 卫生投诉分析平台 — 医疗主题全局样式 ═════ */
+:root {
+  --med-blue: #1a5fb4;
+  --med-blue-light: #3584e4;
+  --med-blue-bg: #e8f1ff;
+  --med-green: #26a269;
+  --med-green-light: #33d17a;
+  --med-green-bg: #e6f9ef;
+  --med-red: #c01c28;
+  --med-red-light: #e01b24;
+  --med-red-bg: #fde8e8;
+  --med-bg: #f0f4f8;
+  --med-card: #ffffff;
+  --med-text: #1f2937;
+  --med-text-sec: #6b7280;
+  --med-border: #e5e7eb;
+  --med-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --med-shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --med-radius: 12px;
+  --med-radius-sm: 8px;
+  --med-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--med-font);
+  background: var(--med-bg);
+  color: var(--med-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═════ Scrollbar ═════ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c4c7cc; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca0a7; }
+
+/* ═════ Global utilities ═════ */
+.med-card {
+  background: var(--med-card);
+  border-radius: var(--med-radius);
+  box-shadow: var(--med-shadow);
+  border: 1px solid var(--med-border);
+  overflow: hidden;
+}
+.med-card-header {
+  padding: 14px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 1px solid var(--med-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.med-card-body { padding: 16px 20px; }
+
+.med-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: var(--med-radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  font-family: var(--med-font);
+}
+.med-btn-primary {
+  background: var(--med-blue);
+  color: #fff;
+}
+.med-btn-primary:hover { background: var(--med-blue-light); }
+.med-btn-danger {
+  background: var(--med-red);
+  color: #fff;
+}
+.med-btn-danger:hover { background: var(--med-red-light); }
+.med-btn-outline {
+  background: #fff;
+  color: var(--med-blue);
+  border: 1.5px solid var(--med-blue);
+}
+.med-btn-outline:hover { background: var(--med-blue-bg); }
+
+/* ═════ Ant Design overrides ═════ */
+.ant-btn-primary { background: var(--med-blue); border-color: var(--med-blue); }
+.ant-btn-primary:hover { background: var(--med-blue-light) !important; border-color: var(--med-blue-light) !important; }
+.ant-btn-primary:disabled { background: #a0b8d6; border-color: #a0b8d6; }
+.ant-select-focused .ant-select-selector { border-color: var(--med-blue) !important; box-shadow: 0 0 0 2px rgba(26,95,180,0.1) !important; }
+.ant-input:focus, .ant-input-focused { border-color: var(--med-blue) !important; box-shadow: 0 0 0 2px rgba(26,95,180,0.1) !important; }
+.ant-tag { border-radius: 6px; font-size: 12px; }
+.ant-progress-bg { background: var(--med-blue) !important; }
+.ant-badge-processing .ant-badge-status-dot { background: var(--med-blue) !important; }
+.ant-checkbox-checked .ant-checkbox-inner { background-color: var(--med-blue); border-color: var(--med-blue); }
+.ant-radio-button-wrapper-checked { border-color: var(--med-blue) !important; color: var(--med-blue) !important; }
+.ant-radio-button-wrapper-checked::before { background-color: var(--med-blue) !important; }
+.ant-switch-checked { background: var(--med-green) !important; }
