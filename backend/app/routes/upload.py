@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import uuid
 import openpyxl
@@ -16,11 +16,11 @@ router = APIRouter(prefix="/api/upload", tags=["upload"])
 
 ALLOWED_EXCEL = {".xlsx", ".xls"}
 ALLOWED_WORD = {".docx"}
+CHUNK_SIZE = 4 * 1024 * 1024  # 4MB chunks for streaming
 
 
 def _safe_filename(original: str) -> str:
-    name, ext = os.path.splitext(original)
-    return f"{uuid.uuid4().hex}{ext}"
+    return f"{uuid.uuid4().hex}{os.path.splitext(original)[1]}"
 
 
 def _verify_project(project_id: int, user_id: int, db: Session) -> Project:
@@ -30,21 +30,38 @@ def _verify_project(project_id: int, user_id: int, db: Session) -> Project:
     return p
 
 
+async def _save_upload_stream(file: UploadFile, save_path: str, max_size: int):
+    """流式写入文件到磁盘，避免一次加载到内存"""
+    total = 0
+    with open(save_path, "wb") as f:
+        while chunk := await file.read(CHUNK_SIZE):
+            total += len(chunk)
+            if total > max_size:
+                raise HTTPException(400, f"文件不能超过{max_size // (1024*1024)}MB")
+            f.write(chunk)
+
+
+def _get_sheets(file_path: str) -> list[str]:
+    try:
+        wb = openpyxl.load_workbook(file_path, read_only=True)
+        sheets = wb.sheetnames
+        wb.close()
+        return sheets
+    except Exception:
+        return []
+
+
 # ═══════════════  sheet 列表 ═══════════════
 
 @router.get("/sheets")
 def list_sheets(file_path: str = Query(...), db: Session = Depends(get_db),
                 user: User = Depends(get_current_user)):
-    """读取 Excel 文件的所有 sheet 名，用于上传前选择。file_path 为临时保存路径。"""
     if not os.path.exists(file_path):
         raise HTTPException(404, "文件不存在")
-    try:
-        wb = openpyxl.load_workbook(file_path, read_only=True)
-        sheets = wb.sheetnames
-        wb.close()
-        return {"sheets": sheets}
-    except Exception as e:
-        raise HTTPException(400, f"无法读取 Excel: {str(e)}")
+    sheets = _get_sheets(file_path)
+    if not sheets:
+        raise HTTPException(400, "无法读取 Excel")
+    return {"sheets": sheets}
 
 
 # ═══════════════  上传 Excel ═══════════════
@@ -56,7 +73,6 @@ async def upload_excel(project_id: int, file: UploadFile = File(...),
     ext = os.path.splitext(file.filename or ".xlsx")[1].lower()
     if ext not in ALLOWED_EXCEL:
         raise HTTPException(400, "仅支持 .xlsx / .xls 文件")
-
     _verify_project(project_id, user.id, db)
 
     safe_name = _safe_filename(file.filename)
@@ -64,13 +80,11 @@ async def upload_excel(project_id: int, file: UploadFile = File(...),
     os.makedirs(user_dir, exist_ok=True)
     save_path = os.path.join(user_dir, safe_name)
 
-    content = await file.read()
-    if len(content) > 500 * 1024 * 1024:
-        raise HTTPException(400, "文件不能超过500MB")
-    with open(save_path, "wb") as f:
-        f.write(content)
+    await _save_upload_stream(file, save_path, 500 * 1024 * 1024)
 
     parsed = parse_excel(save_path, sheet_name=sheet_name if sheet_name else None)
+    sheets = _get_sheets(save_path)
+
     ds = DataSource(
         project_id=project_id, filename=file.filename, file_path=save_path,
         row_count=parsed["row_count"],
@@ -82,7 +96,7 @@ async def upload_excel(project_id: int, file: UploadFile = File(...),
     return {
         "id": ds.id, "filename": ds.filename, "row_count": ds.row_count,
         "columns": parsed["columns"], "preview": parsed["rows"][:10],
-        "sheet_used": sheet_name or "(default)",
+        "sheets": sheets, "sheet_used": sheet_name or sheets[0] if sheets else "(default)",
     }
 
 
@@ -97,7 +111,9 @@ def select_sheet(ds_id: int, sheet_name: str = Query(...),
     ds.columns_json = json.dumps(parsed["columns"], ensure_ascii=False)
     ds.row_count = parsed["row_count"]
     db.commit()
-    return {"id": ds.id, "row_count": ds.row_count, "columns": parsed["columns"], "preview": parsed["rows"][:10], "sheet_used": sheet_name}
+    return {"id": ds.id, "row_count": ds.row_count, "columns": parsed["columns"],
+            "preview": parsed["rows"][:10], "sheet_used": sheet_name}
+
 
 # ═══════════════  上传 Word ═══════════════
 
@@ -107,7 +123,6 @@ async def upload_word(project_id: int, file: UploadFile = File(...),
     ext = os.path.splitext(file.filename or ".docx")[1].lower()
     if ext not in ALLOWED_WORD:
         raise HTTPException(400, "仅支持 .docx 文件")
-
     _verify_project(project_id, user.id, db)
 
     safe_name = _safe_filename(file.filename)
@@ -115,11 +130,7 @@ async def upload_word(project_id: int, file: UploadFile = File(...),
     os.makedirs(user_dir, exist_ok=True)
     save_path = os.path.join(user_dir, safe_name)
 
-    content = await file.read()
-    if len(content) > 200 * 1024 * 1024:
-        raise HTTPException(400, "文件不能超过200MB")
-    with open(save_path, "wb") as f:
-        f.write(content)
+    await _save_upload_stream(file, save_path, 200 * 1024 * 1024)
 
     text = parse_word(save_path)
     doc = PromptDoc(
@@ -139,14 +150,12 @@ def preview_excel(data_source_id: int, db: Session = Depends(get_db),
     ds = db.query(DataSource).filter(DataSource.id == data_source_id).first()
     if not ds:
         raise HTTPException(404, "数据源不存在")
-    project = db.query(Project).filter(Project.id == ds.project_id, Project.user_id == user.id).first()
-    if not project:
-        raise HTTPException(404, "无权限")
+    _verify_project(ds.project_id, user.id, db)
     result = parse_excel(ds.file_path)
     return {"columns": result["columns"], "rows": result["rows"][:100]}
 
 
-# ═══════════════  上传已标注 Excel（子模块独立入口）═══════════════
+# ═══════════════  上传已标注 Excel ═══════════════
 
 @router.post("/labeled-excel/{project_id}")
 async def upload_labeled_excel(project_id: int, file: UploadFile = File(...),
@@ -155,7 +164,6 @@ async def upload_labeled_excel(project_id: int, file: UploadFile = File(...),
     ext = os.path.splitext(file.filename or ".xlsx")[1].lower()
     if ext not in ALLOWED_EXCEL:
         raise HTTPException(400, "仅支持 .xlsx / .xls 文件")
-
     _verify_project(project_id, user.id, db)
 
     safe_name = _safe_filename(file.filename)
@@ -163,14 +171,11 @@ async def upload_labeled_excel(project_id: int, file: UploadFile = File(...),
     os.makedirs(user_dir, exist_ok=True)
     save_path = os.path.join(user_dir, safe_name)
 
-    content = await file.read()
-    if len(content) > 500 * 1024 * 1024:
-        raise HTTPException(400, "文件不能超过500MB")
-    with open(save_path, "wb") as f:
-        f.write(content)
+    await _save_upload_stream(file, save_path, 500 * 1024 * 1024)
 
     parsed = parse_excel(save_path, sheet_name=sheet_name if sheet_name else None)
     columns = parsed["columns"]
+    sheets = _get_sheets(save_path)
 
     label_col_idx = None
     for j, col in enumerate(columns):
@@ -196,11 +201,11 @@ async def upload_labeled_excel(project_id: int, file: UploadFile = File(...),
     db.add(ds)
     db.commit()
     db.refresh(ds)
-
     return {
         "id": ds.id, "filename": ds.filename, "file_path": save_path,
         "row_count": parsed["row_count"], "columns": columns,
-        "label_names": sorted(all_labels), "preview": parsed["rows"][:10],
+        "sheets": sheets, "label_names": sorted(all_labels),
+        "preview": parsed["rows"][:10],
     }
 
 
@@ -213,14 +218,11 @@ def delete_datasource(ds_id: int, db: Session = Depends(get_db),
     if not ds:
         raise HTTPException(404, "文件不存在")
     _verify_project(ds.project_id, user.id, db)
-
-    # 删除物理文件
     try:
         if os.path.exists(ds.file_path):
             os.remove(ds.file_path)
     except OSError:
         pass
-
     db.delete(ds)
     db.commit()
     return {"ok": True}
@@ -233,30 +235,26 @@ def delete_prompt(prompt_id: int, db: Session = Depends(get_db),
     if not p:
         raise HTTPException(404, "文件不存在")
     _verify_project(p.project_id, user.id, db)
-
     try:
         if os.path.exists(p.file_path):
             os.remove(p.file_path)
     except OSError:
         pass
-
     db.delete(p)
     db.commit()
     return {"ok": True}
 
 
-# ═══════════════  列出所有数据源（子模块用）═══════════════
+# ═══════════════  列出所有数据源 ═══════════════
 
 @router.get("/all-datasources/{project_id}")
 def list_all_datasources(project_id: int, db: Session = Depends(get_db),
                           user: User = Depends(get_current_user)):
-    """列出项目下所有数据源，含 results 目录下的已标注文件"""
     _verify_project(project_id, user.id, db)
     items = db.query(DataSource).filter(DataSource.project_id == project_id) \
         .order_by(DataSource.created_at.desc()).all()
     result = []
     for ds in items:
-        # 快速判断是否为已标注文件：检查列名中是否有 AI标签
         try:
             parsed_cols = json.loads(ds.columns_json) if ds.columns_json else []
         except (json.JSONDecodeError, TypeError):
