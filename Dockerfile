@@ -1,4 +1,4 @@
-# Build frontend
+﻿# Build frontend
 FROM node:20-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package.json ./

@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse
@@ -45,6 +45,21 @@ async def upload_template(project_id: int, file: UploadFile = File(...),
     with open(save_path, "wb") as f:
         f.write(content)
     return {"file_path": save_path, "filename": file.filename}
+
+@router.delete("/template/{project_id}")
+def delete_template(project_id: int, path: str = Query(...),
+                    db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """删除已上传的报告模板文件"""
+    project = db.query(Project).filter(Project.id == project_id, Project.user_id == user.id).first()
+    if not project:
+        raise HTTPException(404, '项目不存在')
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+    return {"ok": True}
+
 
 
 @router.post("/generate")

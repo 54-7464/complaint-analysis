@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import uuid
 import openpyxl
@@ -65,8 +65,8 @@ async def upload_excel(project_id: int, file: UploadFile = File(...),
     save_path = os.path.join(user_dir, safe_name)
 
     content = await file.read()
-    if len(content) > 50 * 1024 * 1024:
-        raise HTTPException(400, "文件不能超过50MB")
+    if len(content) > 500 * 1024 * 1024:
+        raise HTTPException(400, "文件不能超过500MB")
     with open(save_path, "wb") as f:
         f.write(content)
 
@@ -103,8 +103,8 @@ async def upload_word(project_id: int, file: UploadFile = File(...),
     save_path = os.path.join(user_dir, safe_name)
 
     content = await file.read()
-    if len(content) > 20 * 1024 * 1024:
-        raise HTTPException(400, "文件不能超过20MB")
+    if len(content) > 200 * 1024 * 1024:
+        raise HTTPException(400, "文件不能超过200MB")
     with open(save_path, "wb") as f:
         f.write(content)
 
@@ -151,8 +151,8 @@ async def upload_labeled_excel(project_id: int, file: UploadFile = File(...),
     save_path = os.path.join(user_dir, safe_name)
 
     content = await file.read()
-    if len(content) > 50 * 1024 * 1024:
-        raise HTTPException(400, "文件不能超过50MB")
+    if len(content) > 500 * 1024 * 1024:
+        raise HTTPException(400, "文件不能超过500MB")
     with open(save_path, "wb") as f:
         f.write(content)
 
