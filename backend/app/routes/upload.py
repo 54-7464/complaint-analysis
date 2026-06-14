@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import uuid
 import openpyxl
@@ -95,7 +95,7 @@ async def upload_excel(project_id: int, file: UploadFile = File(...),
     db.refresh(ds)
     return {
         "id": ds.id, "filename": ds.filename, "row_count": ds.row_count,
-        "columns": parsed["columns"], "preview": parsed["rows"][:10],
+        "columns": parsed["columns"], "preview": parsed["rows"][:200],
         "sheets": sheets, "sheet_used": sheet_name or sheets[0] if sheets else "(default)",
     }
 
@@ -112,7 +112,7 @@ def select_sheet(ds_id: int, sheet_name: str = Query(...),
     ds.row_count = parsed["row_count"]
     db.commit()
     return {"id": ds.id, "row_count": ds.row_count, "columns": parsed["columns"],
-            "preview": parsed["rows"][:10], "sheet_used": sheet_name}
+            "preview": parsed["rows"][:200], "sheet_used": sheet_name}
 
 
 # ═══════════════  上传 Word ═══════════════
@@ -205,7 +205,7 @@ async def upload_labeled_excel(project_id: int, file: UploadFile = File(...),
         "id": ds.id, "filename": ds.filename, "file_path": save_path,
         "row_count": parsed["row_count"], "columns": columns,
         "sheets": sheets, "label_names": sorted(all_labels),
-        "preview": parsed["rows"][:10],
+        "preview": parsed["rows"][:200],
     }
 
 

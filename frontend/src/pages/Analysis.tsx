@@ -160,7 +160,7 @@ export default function Analysis() {
   const { id } = useParams();
   const [jobs, setJobs] = useState<any[]>([]);
   const [selectedJob, setSelectedJob] = useState<number | null>(null);
-  const [colInfo, setColInfo] = useState<ColumnInfo | null>(null);
+  const [colInfo, setColInfo] = useState<ColumnInfo | null>({ columns: [], label_names: [], job_target_field: '' });
   const [rowVars, setRowVars] = useState<VarDef[]>([]);
   const [colVars, setColVars] = useState<VarDef[]>([]);
   const [layerVars, setLayerVars] = useState<VarDef[]>([]);
@@ -362,7 +362,7 @@ export default function Analysis() {
         </div>
       )}
 
-      {(selectedJob || uploadedDs) && colInfo && (
+      {colInfo && (
         <>
           <div className="pro-grid">
             {/* 左侧：变量池 */}

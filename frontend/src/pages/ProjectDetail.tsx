@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, Upload, Button, Table, message, Space, Select, Popconfirm } from 'antd';
 import { UploadOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../services/api';
 
-interface DS { id: number; filename: string; row_count: number; columns_json: string; created_at: string; }
+interface DS { id: number; filename: string; row_count: number; columns_json: string; created_at: string; file_path?: string; }
 interface PD { id: number; filename: string; content_text: string; created_at: string; }
 interface Project { id: number; name: string; description: string; }
 
