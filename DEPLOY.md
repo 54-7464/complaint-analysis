@@ -1,4 +1,4 @@
-# 部署指南 — Railway / Render
+﻿# 部署指南 — Railway / Render
 
 ## 步骤 1：推到 GitHub
 
@@ -59,6 +59,36 @@ SECRET_KEY = 随便输入一串随机字符，比如 aB3xZ9qW7rT1yU8pL5kN2mV6
 2. 注册账号
 3. 右上角点 **AI 设置**，填你自己的 API Key（每个用户用各自的 Key）
 4. 创建项目 → 上传数据 → 开始使用
+
+---
+
+
+---
+
+## 数据持久化（重要！）
+
+**默认情况下，每次 Railway 重新部署都会清空数据库和上传的文件。** 必须挂载 Volume 才能保留数据。
+
+### Railway 配置持久存储
+
+1. 打开 Railway 项目 → 点击你的服务 complaint-analysis
+2. 顶部标签栏点 **Settings** → 左侧点 **Volumes**
+3. 点 **Add Volume**
+4. 配置：
+   - **Mount Path**：/app/data
+   - **Volume Name**：db-data
+5. 再添加一个 Volume：
+   - **Mount Path**：/app/uploads
+   - **Volume Name**：upload-data
+6. 点击 **Deploy** 重新部署
+
+之后无论怎么更新代码，数据库和上传文件都会保留。
+
+### Render 配置
+
+在 Render Dashboard → 服务 → **Disks** → 添加：
+- Mount Path: /app/data, Size: 1 GB
+- Mount Path: /app/uploads, Size: 5 GB
 
 ---
 
