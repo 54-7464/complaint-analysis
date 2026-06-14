@@ -1,56 +1,44 @@
 import { useState, useEffect } from 'react';
-import { Select, Upload, Button, message, Space, Tag, Popconfirm, Radio, Divider } from 'antd';
-import { UploadOutlined, DeleteOutlined, InboxOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { Select, Upload, Button, message, Space, Tag, Popconfirm, Radio } from 'antd';
+import { UploadOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
 import api from '../services/api';
 
-// ========= 类型 =========
 export interface DsItem {
   id: number; filename: string; row_count: number;
   columns: string[]; has_labels: boolean; created_at: string;
-  label_names: string[];  // 上传标注Excel时后端返回的标签名列表
+  label_names: string[];
 }
-interface SheetInfo { sheets: string[]; }
 
-// ========= 组件 =========
 interface Props {
   projectId: string;
-  /** 上游数据（标注任务等），{id, label, row_count?}[] */
   upstreamOptions?: { value: number; label: string; row_count?: number }[];
-  upstreamLabel?: string;     // "已完成标注任务"
-  uploadEndpoint?: string;    // "/upload/labeled-excel" or "/upload/excel"
-  accept?: string;            // ".xlsx,.xls"
+  upstreamLabel?: string;
+  uploadEndpoint?: string;
+  accept?: string;
   onSelectUpstream?: (id: number) => void;
   onSelectUploaded?: (ds: DsItem | null) => void;
   selectedUpstreamId?: number | null;
   selectedUploaded?: DsItem | null;
-  /** 允许删除已上传的文件 */
   allowDelete?: boolean;
-  /** 左侧模式标签 */
   modeLabels?: { upstream: string; upload: string };
 }
 
 export default function DataSourcePicker(props: Props) {
-  const {
-    projectId, upstreamOptions = [], upstreamLabel = "流水线数据",
+  const { projectId, upstreamOptions = [], upstreamLabel = "流水线数据",
     uploadEndpoint, accept = ".xlsx,.xls",
     onSelectUpstream, onSelectUploaded,
-    selectedUpstreamId, selectedUploaded,
-    allowDelete = true, modeLabels,
-  } = props;
-
+    selectedUpstreamId, selectedUploaded, allowDelete = true,
+    modeLabels } = props;
   const ul = modeLabels?.upstream || "前期结果";
   const uu = modeLabels?.upload || "本地上传";
 
-  const [mode, setMode] = useState<'upstream' | 'upload'>(
-    selectedUploaded ? 'upload' : selectedUpstreamId ? 'upstream' : 'upstream'
-  );
+  const [mode, setMode] = useState<'upstream' | 'upload'>(selectedUploaded ? 'upload' : selectedUpstreamId ? 'upstream' : 'upstream');
   const [sheets, setSheets] = useState<string[]>([]);
-  const [selectedSheet, setSelectedSheet] = useState<string>('');
-  const [tempFilePath, setTempFilePath] = useState('');
+  const [selectedSheet, setSelectedSheet] = useState('');
+  const [pendingDsData, setPendingDsData] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [allDs, setAllDs] = useState<DsItem[]>([]);
 
-  // 加载项目下所有数据源
   const loadDs = () => {
     api.get(`/upload/all-datasources/${projectId}`).then(r => setAllDs(r.data)).catch(() => {});
   };
@@ -59,55 +47,45 @@ export default function DataSourcePicker(props: Props) {
   useEffect(() => { if (selectedUpstreamId) setMode('upstream'); }, [selectedUpstreamId]);
   useEffect(() => { if (selectedUploaded) setMode('upload'); }, [selectedUploaded]);
 
-  const handleFileSelect = async (file: File) => {
-    // 先上传到临时位置获取 sheets
-    const form = new FormData(); form.append('file', file);
-    const res = await api.post(`/upload/excel/${projectId}`, form);
-    const dsId = res.data.id;
-    const fp = res.data.file_path || '';
-
-    // 通过原文件读取 sheets
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    const re = new FormData(); re.append('file', file);
-    // 直接用 openpyxl 服务端接口获取 sheets（需要新增临时接口）
-    setTempFilePath(fp);
-    // 把文件再次保存
-    if (fp) {
-      try {
-        // 直接获取 sheets 列表
-        const sheetRes = await api.get(`/upload/sheets?file_path=${encodeURIComponent(fp)}`);
-        const shs: string[] = sheetRes.data.sheets || [];
-        setSheets(shs);
-        if (shs.length > 0) setSelectedSheet(shs[0]);
-      } catch {
-        setSheets([]);
-      }
-    }
-    // 临时上传的 ds 也记录下来
-    loadDs();
-    return false;
-  };
-
   const handleUpload = async (file: File) => {
     setUploading(true);
     try {
       const form = new FormData(); form.append('file', file);
-      if (selectedSheet) form.append('sheet_name', selectedSheet);
-
       const endpoint = uploadEndpoint || `/upload/labeled-excel/${projectId}`;
       const res = await api.post(endpoint, form);
-      const dsItem: DsItem = {
-        id: res.data.id, filename: res.data.filename, row_count: res.data.row_count,
-        columns: res.data.columns || [], has_labels: true, created_at: new Date().toISOString(),
-        label_names: res.data.label_names || [],
-      };
-      onSelectUploaded?.(dsItem);
-      setSheets([]); setSelectedSheet(''); setTempFilePath('');
-      loadDs();
-      message.success(`已上传: ${res.data.filename} (${res.data.row_count} 行)`);
-    } catch (err: any) { message.error(err.response?.data?.detail || '上传失败'); }
-    finally { setUploading(false); }
+      const shs: string[] = (res.data.sheets && res.data.sheets.length > 0) ? res.data.sheets : [];
+
+      if (shs.length > 1) {
+        setSheets(shs); setSelectedSheet(shs[0]);
+        setPendingDsData(res.data);
+        message.info(`请选择 Sheet（当前: ${res.data.sheet_used || '默认'}）`);
+        setUploading(false); return false;
+      }
+      finishWithData(res.data);
+    } catch (err: any) { message.error(err.response?.data?.detail || '上传失败'); setUploading(false); }
     return false;
+  };
+
+  const finishWithData = (data: any) => {
+    const dsItem: DsItem = {
+      id: data.id, filename: data.filename, row_count: data.row_count,
+      columns: data.columns || [], has_labels: true, created_at: new Date().toISOString(),
+      label_names: data.label_names || [],
+    };
+    onSelectUploaded?.(dsItem);
+    setSheets([]); setSelectedSheet(''); setPendingDsData(null);
+    setUploading(false);
+    loadDs();
+    message.success(`已上传: ${data.filename} (${data.row_count} 行)`);
+  };
+
+  const confirmSheet = async () => {
+    if (!pendingDsData) return;
+    setUploading(true);
+    try {
+      const res = await api.post(`/upload/select-sheet/${pendingDsData.id}?sheet_name=${encodeURIComponent(selectedSheet)}`);
+      finishWithData({ ...pendingDsData, columns: res.data.columns, row_count: res.data.row_count });
+    } catch { message.error('切换 Sheet 失败'); setUploading(false); }
   };
 
   const handleDeleteDs = async (dsId: number) => {
@@ -142,9 +120,7 @@ export default function DataSourcePicker(props: Props) {
           />
           {allDs.length > 0 && (
             <details style={{ marginTop: 8 }}>
-              <summary style={{ cursor: 'pointer', color: '#888', fontSize: 12 }}>
-                历史文件 ({allDs.length})
-              </summary>
+              <summary style={{ cursor: 'pointer', color: '#888', fontSize: 12 }}>历史文件 ({allDs.length})</summary>
               <div style={{ maxHeight: 120, overflow: 'auto', marginTop: 4 }}>
                 {allDs.map(ds => (
                   <div key={ds.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0', fontSize: 12 }}>
@@ -166,21 +142,22 @@ export default function DataSourcePicker(props: Props) {
 
       {mode === 'upload' && (
         <div>
-          <Upload.Dragger
-            beforeUpload={handleUpload}
-            showUploadList={false}
-            accept={accept}
-            style={{ padding: '12px 16px' }}
-          >
-            <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-            <p className="ant-upload-text">点击或拖拽上传文件</p>
-          </Upload.Dragger>
+          {!pendingDsData && (
+            <Upload.Dragger beforeUpload={handleUpload} showUploadList={false} accept={accept}
+              style={{ padding: '12px 16px' }}>
+              <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+              <p className="ant-upload-text">点击或拖拽上传文件</p>
+            </Upload.Dragger>
+          )}
 
-          {sheets.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <label style={{ fontSize: 12, color: '#666' }}>选择 Sheet：</label>
-              <Select size="small" style={{ width: '100%' }} value={selectedSheet} onChange={setSelectedSheet}
+          {/* Sheet selector */}
+          {sheets.length > 1 && pendingDsData && (
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: '#f6ffed', borderRadius: 4 }}>
+              <span style={{ fontSize: 12 }}>选择 Sheet：</span>
+              <Select size="small" style={{ flex: 1 }} value={selectedSheet} onChange={setSelectedSheet}
                 options={sheets.map(s => ({ label: s, value: s }))} />
+              <Button size="small" type="primary" loading={uploading} onClick={confirmSheet}>确认</Button>
+              <Button size="small" onClick={() => { setSheets([]); setPendingDsData(null); setUploading(false); }}>取消</Button>
             </div>
           )}
 

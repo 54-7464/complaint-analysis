@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button, Card, Upload, Select, Input, message, Space, Tag, Divider, Collapse, Table as AntTable, Popconfirm } from 'antd';
 import { UploadOutlined, FileTextOutlined, DownloadOutlined, PlusOutlined, SendOutlined, DeleteOutlined, ExpandOutlined, CompressOutlined } from '@ant-design/icons';
@@ -203,7 +203,7 @@ export default function Report() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {panels.map((panel, idx) => {
-          const tableData = useMemo(() => parseTableData(panel.tableText), [panel.tableText]);
+          const tableData = parseTableData(panel.tableText);
           return (
             <Card
               key={panel.key}
