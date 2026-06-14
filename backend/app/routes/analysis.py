@@ -10,6 +10,7 @@ from ..models.user import User
 from ..models.project import Project, DataSource
 from ..models.labeling import LabelingJob, Label, DataLabel, LabelingRow
 from ..auth import get_current_user
+from ..services.security import validate_upload_path
 from ..config import settings
 from ..services.excel_handler import parse_excel, write_binarized_excel
 from ..services.binarizer import binarize_labels
@@ -376,9 +377,11 @@ def binarize(req: BinarizeRequest, db: Session = Depends(get_db), user: User = D
 def download_binarized(token: str = Query(None), path: str = Query(None), db: Session = Depends(get_db)):
     """下载二值化文件。通过 path 参数指定文件路径。"""
     uid = _token_to_uid(token)
-    if path and os.path.exists(path):
-        return FileResponse(path, filename="二值化结果.xlsx",
-                            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    if path:
+        safe_path = validate_upload_path(path)
+        if os.path.exists(safe_path):
+            return FileResponse(safe_path, filename="二值化结果.xlsx",
+                                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     raise HTTPException(404, "文件不存在")
 
 

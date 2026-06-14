@@ -11,6 +11,7 @@ from ..auth import get_current_user
 from ..config import settings
 from ..services.excel_handler import parse_excel
 from ..services.word_parser import parse_word
+from ..services.security import validate_upload_path
 
 router = APIRouter(prefix="/api/upload", tags=["upload"])
 
@@ -56,9 +57,10 @@ def _get_sheets(file_path: str) -> list[str]:
 @router.get("/sheets")
 def list_sheets(file_path: str = Query(...), db: Session = Depends(get_db),
                 user: User = Depends(get_current_user)):
-    if not os.path.exists(file_path):
+    safe_path = validate_upload_path(file_path)
+    if not os.path.exists(safe_path):
         raise HTTPException(404, "文件不存在")
-    sheets = _get_sheets(file_path)
+    sheets = _get_sheets(safe_path)
     if not sheets:
         raise HTTPException(400, "无法读取 Excel")
     return {"sheets": sheets}

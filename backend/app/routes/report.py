@@ -17,6 +17,7 @@ from ..services.excel_handler import parse_excel
 from ..services.ai_labeler import call_ai
 from ..services.report_gen import extract_template_structure, generate_report_docx
 from ..services.crypto import decrypt_api_key
+from ..services.security import validate_upload_path
 
 router = APIRouter(prefix="/api/report", tags=["report"])
 
@@ -53,9 +54,10 @@ def delete_template(project_id: int, path: str = Query(...),
     project = db.query(Project).filter(Project.id == project_id, Project.user_id == user.id).first()
     if not project:
         raise HTTPException(404, '项目不存在')
+    safe_path = validate_upload_path(path)
     try:
-        if os.path.exists(path):
-            os.remove(path)
+        if os.path.exists(safe_path):
+            os.remove(safe_path)
     except OSError:
         pass
     return {"ok": True}
