@@ -1,0 +1,11 @@
+backend/uploads
+backend/data
+backend/__pycache__
+backend/app/__pycache__
+backend/app/**/__pycache__
+backend/.env
+frontend/node_modules
+frontend/dist
+.git
+*.pyc
+__pycache__

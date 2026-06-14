@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production-please}
+      - FERNET_KEY=${FERNET_KEY:-}
+    restart: unless-stopped
