@@ -174,6 +174,8 @@ def run_analysis(req: AnalysisRequest, db: Session = Depends(get_db),
                     if "col_pct" in req.stats:
                         col_total = _count_for_level(cv_obj, cl, data_rows)
                         row_d[f"{col_key}\n(列%)"] = round(obs / col_total * 100, 1) if col_total > 0 else 0
+                    if "total_pct" in req.stats:
+                        row_d[f"{col_key}\n(总%)"] = round(obs / total_n * 100, 1) if total_n > 0 else 0
                 merged_cross_rows.append(row_d)
 
         total_row: dict = {"变量": "列总计", "类别": "", "行总计": total_n}
@@ -186,6 +188,8 @@ def run_analysis(req: AnalysisRequest, db: Session = Depends(get_db),
                 total_row[f"{col_key}\n(行%)"] = ""
             if "col_pct" in req.stats:
                 total_row[f"{col_key}\n(列%)"] = round(ct / total_n * 100, 1) if total_n > 0 else 0
+            if "total_pct" in req.stats:
+                total_row[f"{col_key}\n(总%)"] = round(ct / total_n * 100, 1) if total_n > 0 else 0
         merged_cross_rows.append(total_row)
 
         headers = ["变量", "类别", "行总计"]
@@ -196,10 +200,28 @@ def run_analysis(req: AnalysisRequest, db: Session = Depends(get_db),
                 headers.append(f"{key}\n(行%)")
             if "col_pct" in req.stats:
                 headers.append(f"{key}\n(列%)")
+            if "total_pct" in req.stats:
+                headers.append(f"{key}\n(总%)")
+
+        chi_square_result = None
+        if "chi_square" in req.stats and len(row_vars) == 1 and len(col_vars) == 1:
+            try:
+                from ..services.spss_engine import cross_tab as spss_cross
+                ct = spss_cross(row_vars[0], col_vars[0], data_rows, total_n)
+                if ct.chi_square:
+                    chi_square_result = {
+                        "chi_square": ct.chi_square.chi_square,
+                        "df": ct.chi_square.df,
+                        "p_value": ct.chi_square.p_value,
+                        "cramer_v": ct.chi_square.cramer_v,
+                        "significant": ct.chi_square.significant,
+                    }
+            except: pass
 
         cross_tables.append({
             "title": f"交叉表（{total_n} 条记录）",
             "n": total_n, "headers": headers, "rows": merged_cross_rows,
+            "chi_square": chi_square_result,
         })
         narratives.append(f"交叉分析：{len(row_vars)} 行变量 × {len(col_vars)} 列变量")
 
