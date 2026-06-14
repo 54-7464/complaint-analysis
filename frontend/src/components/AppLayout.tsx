@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Button, Modal, Input, message, Tag, Select } from 'antd';
 import {
@@ -138,11 +138,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 }
               }}
               options={[
-                { label: 'DeepSeek（deepseek-chat）', value: 'deepseek' },
-                { label: '智谱 GLM（glm-4-flash）', value: 'zhipu' },
-                { label: '通义千问（qwen-plus）', value: 'qwen' },
-                { label: 'OpenAI（gpt-4o）', value: 'openai' },
-                { label: 'Moonshot（moonshot-v1-8k）', value: 'moonshot' },
+                { label: 'DeepSeek', value: 'deepseek' },
+                { label: '智谱 GLM', value: 'zhipu' },
+                { label: '通义千问', value: 'qwen' },
+                { label: 'OpenAI', value: 'openai' },
+                { label: 'Moonshot', value: 'moonshot' },
               ]}
             />
           </div>
