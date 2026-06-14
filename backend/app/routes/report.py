@@ -181,3 +181,64 @@ def analyze_table(req: TableAnalysisRequest, db: Session = Depends(get_db),
         result = f"❌ AI 调用失败：{str(e)}"
 
     return {"result": result, "model_used": model}
+
+
+class AnalyzeJobRequest(BaseModel):
+    job_id: int
+    instruction: str
+    model: str = ''
+
+
+@router.post('/analyze-job')
+def analyze_job(req: AnalyzeJobRequest, db: Session = Depends(get_db),
+                user: User = Depends(get_current_user)):
+    """对流水线标注结果进行AI自然语言分析"""
+    cfg = db.query(UserAIConfig).filter(UserAIConfig.user_id == user.id).first()
+    if not cfg or not cfg.api_key_encrypted:
+        raise HTTPException(400, "请先配置 AI API Key")
+
+    job = db.query(LabelingJob).filter(LabelingJob.id == req.job_id).first()
+    if not job:
+        raise HTTPException(404, "标注任务不存在")
+    project = db.query(Project).filter(Project.id == job.project_id, Project.user_id == user.id).first()
+    if not project:
+        raise HTTPException(404, "无权限")
+
+    api_key = decrypt_api_key(cfg.api_key_encrypted)
+    model = req.model or cfg.model_name
+
+    labels = db.query(Label).filter(Label.labeling_job_id == job.id).all()
+    label_names = [l.name for l in labels]
+
+    excel_path = job.labeled_file_path or job.data_source.file_path
+    summary_text = ""
+    if excel_path and os.path.exists(excel_path):
+        parsed = parse_excel(excel_path)
+        from collections import Counter
+        label_counter = Counter()
+        lci = _find_label_column_fast(parsed["columns"])
+        for row in parsed["rows"]:
+            if lci is not None and lci < len(row) and row[lci]:
+                for lbl in str(row[lci]).replace("，", ",").split(","):
+                    lbl = lbl.strip()
+                    if lbl:
+                        label_counter[lbl] += 1
+        summary_text = f'数据总量: {parsed.row_count} 条\\n标签种类: {len(label_names)} 个\\n标签分布:\\n{json.dumps(dict(label_counter), ensure_ascii=False, indent=2)}'
+
+    prompt = f'''你是专业数据分析师。基于以下标注结果进行分析。\\n\\n【分析指令】\\n{req.instruction}\\n\\n【标注数据摘要】\\n{summary_text}\\n\\n【输出要求】\\n- 直接回答分析指令\\n- 使用 Markdown 格式\\n- 如有数值计算写出过程和公式'''
+
+    try:
+        result = call_ai(prompt, api_key, cfg.base_url, model)
+    except Exception as e:
+        result = f"AI调用失败: {str(e)}"
+
+    return {"result": result, "model_used": model}
+
+
+def _find_label_column_fast(columns: list) -> int | None:
+    for j, col in enumerate(columns):
+        if ("标签" in str(col).strip() and "思考" not in str(col).strip()):
+            return j
+    if len(columns) >= 2:
+        return len(columns) - 2
+    return None
