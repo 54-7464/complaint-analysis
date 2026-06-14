@@ -86,6 +86,19 @@ async def upload_excel(project_id: int, file: UploadFile = File(...),
     }
 
 
+@router.post("/select-sheet/{ds_id}")
+def select_sheet(ds_id: int, sheet_name: str = Query(...),
+                  db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    ds = db.query(DataSource).filter(DataSource.id == ds_id).first()
+    if not ds:
+        raise HTTPException(404, "文件不存在")
+    _verify_project(ds.project_id, user.id, db)
+    parsed = parse_excel(ds.file_path, sheet_name=sheet_name)
+    ds.columns_json = json.dumps(parsed["columns"], ensure_ascii=False)
+    ds.row_count = parsed["row_count"]
+    db.commit()
+    return {"id": ds.id, "row_count": ds.row_count, "columns": parsed["columns"], "preview": parsed["rows"][:10], "sheet_used": sheet_name}
+
 # ═══════════════  上传 Word ═══════════════
 
 @router.post("/word/{project_id}")
